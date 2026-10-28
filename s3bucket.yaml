@@ -1,0 +1,26 @@
+Resources:
+  S3-L00205475:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: s3-L00205475
+      WebsiteConfiguration: ## property used to configure the bucket as a static website hosting (Ref.: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-s3-bucket.html)
+        IndexDocument: index.html
+        #ErrorDocument: error.html
+
+  Outputs:
+    WebsiteURL:
+      Value: !GetAtt
+        - S3-L00205475
+        - WebsiteURL
+      Description: URL for the webpage        
+
+
+      ...
+##Create a policy to access the bucket's website
+  s3-L00205475-policy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: s3-L00205475
+
+
+      ##For more information: https://catalog.us-east-1.prod.workshops.aws/workshops/df7f72cf-4f10-4664-acb6-b30dc8d4bcf0/en-US/lab2

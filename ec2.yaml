@@ -1,0 +1,11 @@
+Resources:
+  EC2-L00205475:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-04b938437b69a2c9c
+      InstanceType: t3.micro
+      KeyName: camiladevkeypair
+      Tags:
+        - Key: Name
+        - Value: CA1
+        
