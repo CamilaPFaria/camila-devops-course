@@ -1,0 +1,41 @@
+##create a role to be assigned to the ec2 instance to access the webpage stored in the bucket
+Resources:
+  BucketAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Descritpion: Role assigned to EC2 instance to access the bucket contents
+      AssumeRolePolicyDocument: ##define which entities can assume the role
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com ##ec2 service is configured to assume the role
+            Action:
+              - sts:AssumeRole
+  BucketPolicy: ##defines what the role can access
+    Type: AWS::IAM:Policy
+    Properties:
+      PolicyName: BucketAccess
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject #the policy allows that this role is able to read the contents
+            Resource: "*"
+      Roles:
+      - !Ref BucketAccessRole
+
+
+        
+
+        ##Ref: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-role.html
+        ## https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-role.html#aws-resource-iam-role--examples
+        ## https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html
+        ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/quickref-iam.html 
+
+
+
+
+
