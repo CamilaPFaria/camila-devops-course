@@ -1,6 +1,6 @@
 ##create a role to be assigned to the ec2 instance to access the webpage stored in the bucket
 Resources:
-  BucketAccessRole:
+  EC2S3AccessRole:
     Type: AWS::IAM::Role
     Properties:
       Descritpion: Role assigned to EC2 instance to access the bucket contents
@@ -13,8 +13,8 @@ Resources:
                 - ec2.amazonaws.com ##ec2 service is configured to assume the role
             Action:
               - sts:AssumeRole
-  BucketPolicy: ##defines what the role can access
-    Type: AWS::IAM:Policy
+  S3AccessPolicy: ##defines what the role can access
+    Type: AWS::IAM::Policy
     Properties:
       PolicyName: BucketAccess
       PolicyDocument:
@@ -22,11 +22,19 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - s3:GetObject #the policy allows that this role is able to read the contents
-            Resource: "*"
+              - s3:GetObject #this policy allows that this role is able to only read the contents
+              - s3:ListBucket
+            Resource:
+              - !GetAtt WebAssetsBucket.Arn          
+              - !Sub "${WebAssetsBucket.Arn}/*"
       Roles:
-      - !Ref BucketAccessRole
-
+      - !Ref EC2S3AccessRole
+  EC2RoleProfile:
+        Type: AWS::IAM::InstanceProfile  ##This is needed becaused EC2 can't accept IAM role directly. The InstanceProfile resource passes the role credentials to an EC2 instance. 
+        Properties:                       ##Ref: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-instanceprofile.html
+          Path: "/"                         ##Ref:https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+          Roles:
+          - !Ref EC2S3AccessRole    
 
         
 
