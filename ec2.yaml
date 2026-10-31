@@ -3,18 +3,16 @@ Resources:
     Type: AWS::EC2::Instance
     Metadata:
       AWS::CloudFormation::Init:
-        config:                                                 # packages: installs the httpd package using yum
-          packages:                                             # services: ensures httpd starts and runs automatically 
-            yum:                                                # Ref: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/deploying.applications.html
+        config:                                                 
+          packages:  # packages: installs the httpd package using yum                                            
+            yum:      # Ref: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/deploying.applications.html                                          
               http: []
-          services:
-            systemd:
+          services: # services: ensures httpd starts and runs automatically 
+            systemd: # Ref: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/deploying.applications.html
               httpd:
                 enabled: true
                 ensureRunning: true    
     Properties:
-    
-
       ImageId: ami-04b938437b69a2c9c
       InstanceType: t3.micro
       KeyName: camiladevkeypair
@@ -22,13 +20,12 @@ Resources:
         - Key: Name
         - Value: EC2-web-server
       EC2Role: !Ref EC2InstanceProfile ##this property assigns the role through InstanceProfile resource
-      UserData: 
+      UserData: #UserData: Install the latest bootstrap tools and calls cfn-init
         Fn::Base64:
-          !Sub |                                             #UserData: Install the latest bootstrap tools and calls cfn-init
+          !Sub |                                             
           #!/bin/bash
-          yum install -y aws-cfn-bootstrap
+          yum install -y aws-cfn-bootstrap 
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource WebServerEC2 --region ${AWS::Region}
-
       # ===================================================================================
       #                                   PSEUDO PARAMETERS
       # ${AWS::StackName} and ${AWS::Region} are built-in variables that provide access to AWS env information. 
@@ -38,13 +35,8 @@ Resources:
 
         
 
-
-
-
-
-
  
-  # ================================================================================
+  # ======================Metadata configuration==========================================================
   # EC2Instance:
   #  Type: AWS::EC2::Instance
   #  Metadata:                       # Metadata section for the resource
