@@ -131,9 +131,9 @@ Resources:
           };
   #=============================================================================================================================
   UploadIndexHtml: #Ref.: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-cloudformation-customresource.html
-    Type: Custom::S3Objects
+    Type: Custom::S3Objects #Ref.: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/crpg-ref.html
     Properties:
-      ServiceToken: !GetAtt WebsiteUploadLambda.Arn
+      ServiceToken: !GetAtt WebsiteUploadLambda.Arn #Lambda function ARN from the same Region as the stack
       TargetBucket: !Ref WebAssetsBucket
   #=============================================================================================================================
   WebServerEC2:
