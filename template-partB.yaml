@@ -1,8 +1,63 @@
+#============================================================================#
+#          This template creates the Stack for part B of the CA              #       
+#============================================================================#
 Resources:
+  CA1VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: CA1VPC
+  InternetGateway: # 2. Internet Gateway (Allows traffic to/from the internet)
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CA-IGW
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref CA1VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicSubnet: # Public Subnet
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref CA1VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true # Automatically assigns public IPs to instances
+      AvailabilityZone: !Select [0, !GetAZs ''] # selects the first AZ within the region
+      Tags:
+        - Key: Name
+          Value: CA-Public-Subnet
+  PublicRouteTable: 
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref CA1VPC
+      Tags:
+        - Key: Name
+          Value: CA-Public-RouteTable
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  # 5. Associate Subnet with Route Table
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+#============================================================================#
+#============================================================================#
   WebAssetsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: s3-camila-index
+      BucketName: s3-index-camila
       WebsiteConfiguration: ## property used to configure the bucket as a static website hosting (Ref.: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-s3-bucket.html)
         IndexDocument: index.html
         #ErrorDocument: error.html
@@ -11,7 +66,8 @@ Resources:
   EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties: 
-      GroupDescription: Allow HTTP access through 80 port 
+      GroupDescription: Allow HTTP access through 80 port
+      VpcId: !Ref CA1VPC #assigns the security group to the CA1VPC
       SecurityGroupIngress: 
         - IpProtocol: tcp
           Description: HTTP
@@ -86,7 +142,6 @@ Resources:
             Resource: !Sub '${WebAssetsBucket.Arn}/*'
       Roles: 
         - !Ref WebsiteUploadLambdaRole         
-
   #================================================================================================================
   EC2RoleProfile:
     Type: AWS::IAM::InstanceProfile  ##This is needed becaused EC2 can't accept IAM role directly. The InstanceProfile resource passes the role credentials to an EC2 instance. 
@@ -149,6 +204,7 @@ Resources:
       Tags:
         - Key: Name
           Value: EC2-webserver
+      SubnetId: !Ref PublicSubnet   
       IamInstanceProfile: !Ref EC2RoleProfile ##this property assigns the role through InstanceProfile resource
       UserData: #UserData: Install the latest bootstrap tools and calls cfn-init
         Fn::Base64:
@@ -166,7 +222,10 @@ Outputs:
   WebsiteURL:
     Value: !Sub 'http://${WebServerEC2.PublicIp}' 
   S3BucketName:
-    Value: !Ref WebAssetsBucket          
+    Value: !Ref WebAssetsBucket
+
+    
+    
    
 
 

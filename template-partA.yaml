@@ -1,0 +1,178 @@
+#============================================================================#
+#          This template creates the Stack for part A of the CA              #       
+#============================================================================#
+Resources:
+  WebAssetsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: s3-camila-index
+      WebsiteConfiguration: ## property used to configure the bucket as a static website hosting (Ref.: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-s3-bucket.html)
+        IndexDocument: index.html
+        #ErrorDocument: error.html
+      ##For more information: https://catalog.us-east-1.prod.workshops.aws/workshops/df7f72cf-4f10-4664-acb6-b30dc8d4bcf0/en-US/lab2
+#========================================================================================================================================
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Allow HTTP access through 80 port 
+      SecurityGroupIngress: 
+        - IpProtocol: tcp
+          Description: HTTP
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0 
+#======================================================================================================================================
+##Role to be assigned to the ec2 instance to access the webpage stored in the bucket
+  EC2S3AccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Role assigned to EC2 instance to access the bucket contents
+      AssumeRolePolicyDocument: ##define which entities can assume the role
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com ##ec2 service is configured to assume the role
+            Action:
+              - sts:AssumeRole
+  #==============================================================================================            
+  #Role to assign to the lambda function resource to upload the website contents to the s3 bucket
+  WebsiteUploadLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Role assigned to the Lambda fucntion to upload the contents of the website to the S3 bucket.
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+                Service: 
+                  - lambda.amazonaws.com #Lambda service will have the role. 
+            Action: sts:AssumeRole
+      ManagedPolicyArns: #this is a ready to use policy that allows Lambda fucntions to create logs entries in CloudWatch when the code runs. It is needed for troubleshooting and debbuging. 
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole' #Ref.: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_managed-vs-inline.html
+  #=========================================================================================================            
+  S3AccessPolicy: ##defines what the role can access
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: BucketAccess
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject #this policy allows that this role is able to only read the contents
+              - s3:ListBucket
+            Resource:
+              - !GetAtt WebAssetsBucket.Arn          
+              - !Sub "${WebAssetsBucket.Arn}/*"
+      Roles:
+      - !Ref EC2S3AccessRole
+  #===============================================================================================================
+  #This policy allows objects to be uploaded and deleted to/from the S3 bucket. This will be assigned to the WebsiteUploadLambdaRole and the role assigned to the Lambda function.  
+  S3PutObjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: BucketUpload 
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource: !Sub '${WebAssetsBucket.Arn}/*'
+      Roles: 
+        - !Ref WebsiteUploadLambdaRole         
+
+  #================================================================================================================
+  EC2RoleProfile:
+    Type: AWS::IAM::InstanceProfile  ##This is needed becaused EC2 can't accept IAM role directly. The InstanceProfile resource passes the role credentials to an EC2 instance. 
+    Properties:                       ##Ref: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-instanceprofile.html
+      Path: "/"                         ##Ref:https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html
+      Roles:
+        - !Ref EC2S3AccessRole
+        #==================================================================================================================================    
+        ##Ref: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-role.html
+        ## https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-iam-role.html#aws-resource-iam-role--examples
+        ## https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html
+        ## https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/quickref-iam.html
+        #================================================================================================================================
+        ##===============================================================================================================================  
+    #=========================================================================================================
+  WebsiteUploadLambda:
+    Type: AWS::Lambda::Function
+    Properties: 
+      Runtime: nodejs18.x
+      Handler: index.handler
+      Role: !GetAtt WebsiteUploadLambdaRole.Arn
+      Code:
+        ZipFile: |
+          const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+          const response = require('cfn-response');
+          const s3 = new S3Client();
+
+          exports.handler = async (event, context) => {
+            if (event.RequestType === 'Delete') {
+              return await response.send(event, context, response.SUCCESS);
+            }
+            try {
+              await s3.send(new PutObjectCommand({
+                Bucket: event.ResourceProperties.TargetBucket,
+                Key: 'index.html',
+                Body: '<html><body><h1>Camila Pulz de Faria - L00205475!</h1></body></html>',
+                ContentType: 'text/html'
+              }));
+              await response.send(event, context, response.SUCCESS);
+            } catch (error) {
+              console.error(error);
+              await response.send(event, context, response.FAILED);
+            }
+          };
+  #=============================================================================================================================
+  UploadIndexHtml: #Ref.: https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-cloudformation-customresource.html
+    Type: Custom::S3Objects #Ref.: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/crpg-ref.html
+    Properties:
+      ServiceToken: !GetAtt WebsiteUploadLambda.Arn #Lambda function ARN from the same Region as the stack
+      TargetBucket: !Ref WebAssetsBucket
+  #=============================================================================================================================
+  WebServerEC2:
+    Type: AWS::EC2::Instance
+    DependsOn: UploadIndexHtml #ensures the index file is uploaded before EC2 boots up. 
+    Properties:
+      ImageId: ami-04b938437b69a2c9c
+      InstanceType: t3.micro
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: EC2-webserver
+      IamInstanceProfile: !Ref EC2RoleProfile ##this property assigns the role through InstanceProfile resource
+      UserData: #UserData: Install the latest bootstrap tools and calls cfn-init
+        Fn::Base64:
+          !Sub |                                             
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y httpd aws-cli
+          systemctl start httpd
+          systemctl enable httpd
+          aws s3 cp s3://${WebAssetsBucket}/index.html /var/www/html/index.html
+          chmod 644 /var/www/html/index.html
+          systemctl start httpd
+#===============================================================          
+Outputs:
+  WebsiteURL:
+    Value: !Sub 'http://${WebServerEC2.PublicIp}' 
+  S3BucketName:
+    Value: !Ref WebAssetsBucket          
+   
+
+
+
+
+
